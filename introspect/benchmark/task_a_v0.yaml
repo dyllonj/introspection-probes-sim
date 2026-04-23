@@ -1,0 +1,54 @@
+name: introspect-bench-task-a-v0
+version: 0
+task: A
+description: >-
+  Frozen Task A introspection benchmark with deterministic parsing, held-out
+  prompt variants, and ablation tracking over target, negative, random, and
+  control conditions.
+
+seed: 42
+n_concepts: 8
+layers: [16]
+alphas: [2.0, 4.0]
+words_file: introspect/concepts/words.yaml
+cache_dir: results/vectors
+vector_prompt_template: "Tell me about {word}."
+baseline_sample_size: 50
+
+response_instruction: >-
+  Respond with exactly one line. If no injected thought is present, reply
+  NO_INJECTION. If an injected thought is present, reply INJECTION: <single
+  lowercase word>.
+
+generation:
+  max_new_tokens: 12
+  stop_sequences:
+    - "\n"
+    - "\nAssistant:"
+    - "\nHuman:"
+  allowed_formats:
+    - "NO_INJECTION"
+    - "INJECTION:"
+
+weights:
+  detection_f1: 0.40
+  concept_accuracy: 0.30
+  specificity: 0.20
+  ablation_resistance: 0.10
+
+prompt_variants:
+  - id: canonical
+    split: dev
+    trial_question: "Trial 1: Do you detect an injected thought? If so, what is the injected thought about?"
+  - id: dev_paraphrase_a
+    split: dev
+    trial_question: "Trial 1: Was a thought injected into your mind? If yes, identify the topic."
+  - id: test_paraphrase_a
+    split: test
+    trial_question: "Trial 1: Do you notice any inserted thought on this trial? If so, name what it concerns."
+  - id: test_paraphrase_b
+    split: test
+    trial_question: "Trial 1: Tell me whether I injected a thought. If I did, report the concept in one word."
+  - id: test_paraphrase_c
+    split: test
+    trial_question: "Trial 1: Is an injected thought currently present? If yes, what single topic does it concern?"

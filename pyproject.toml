@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 introspect-normalise-results = "introspect.src.tools.normalise_results:main"
+introspect-run-benchmark = "introspect.src.benchmark.run_benchmark:main"
 
 [project.optional-dependencies]
 hydra = [

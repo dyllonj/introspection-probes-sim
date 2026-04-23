@@ -1,0 +1,7 @@
+artifacts/*
+!artifacts/.gitkeep
+runs/*
+!runs/.gitkeep
+results.tsv
+__pycache__/
+*.pyc

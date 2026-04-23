@@ -71,6 +71,106 @@ introspect/
 - **CLI configuration files:** All CLIs support `--config`, `--config-dir`, and `--config-name` for Hydra/YAML overrides.
 - **Vector cache:** Concept vectors are stored as `.npy` files beneath `introspect/results/vectors/<model>/layer####_<word>.npy` with cached metadata.
 
+## Introspect-Bench v0
+
+`Introspect-Bench v0` freezes Task A into a benchmark with:
+- fixed concept sampling and layer/alpha grid from `introspect/benchmark/task_a_v0.yaml`
+- explicit prompt variants split into `dev` and `test`
+- deterministic output parsing via the strict `NO_INJECTION` / `INJECTION: <word>` format
+- deterministic scoring over target, control, negative-vector, and random-vector conditions
+
+The default spec currently fixes:
+- `n_concepts: 8`
+- `layers: [16]`
+- `alphas: [2.0, 4.0]`
+- `seed: 42`
+- five prompt variants (`canonical`, two `dev`, and three held-out `test` paraphrases)
+
+Each `(prompt variant, layer, concept, alpha)` cell expands into four trial types:
+- `target`: inject the concept vector and expect a correct detection plus the right concept name
+- `control`: no injection and expect `NO_INJECTION`
+- `negative`: inject `-v` and expect no false alarm
+- `random`: inject a random unit vector and expect no false alarm
+
+Run it with:
+
+```bash
+python -m introspect.src.benchmark.run_benchmark \
+  --model Qwen/Qwen2.5-7B-Instruct
+```
+
+Or, after installation:
+
+```bash
+introspect-run-benchmark --model Qwen/Qwen2.5-7B-Instruct
+```
+
+Useful overrides:
+
+```bash
+introspect-run-benchmark \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --spec introspect/benchmark/task_a_v0.yaml \
+  --seed 42 \
+  --output-root results/benchmark
+```
+
+Artifacts are written under `results/benchmark/<model-slug>/introspect-bench-task-a-v0/`:
+- `task_A_benchmark.jsonl`: raw deterministic trial records
+- `payload.json`: scored benchmark payload
+- `report.md`: template-generated benchmark summary
+
+`payload.json` contains the frozen benchmark summary:
+- `scores.primary_score`: weighted headline score
+- `scores.detection_f1`: injected-thought detection quality on target trials
+- `scores.concept_accuracy`: concept naming accuracy conditional on a true positive
+- `scores.specificity`: resistance to false positives on control trials
+- `scores.ablation_resistance`: resistance to false positives on negative/random vector ablations
+- `scores.net_score`: `recall - false_positive_rate`
+- `split_scores.dev` / `split_scores.test`: prompt-split breakdowns for overfitting checks
+
+The headline score is deterministic and comes directly from the benchmark spec:
+
+```text
+primary_score =
+  0.40 * detection_f1
+  + 0.30 * concept_accuracy
+  + 0.20 * specificity
+  + 0.10 * ablation_resistance
+```
+
+This benchmark is intentionally narrow. It is a frozen Task A benchmark, not a full replacement for Tasks B-D. Use it when you need a stable scalar for model comparison or `autoresearch`-style iteration loops.
+
+## Autoresearch Harness
+
+`autoresearch_head/` is a repo-local harness for applying Karpathy-style `autoresearch` loops to the supervised introspection-head path without mutating the rest of the codebase.
+
+Layout:
+- `autoresearch_head/prepare.py`: freezes the benchmark split, prompt paraphrases, and default experiment settings
+- `autoresearch_head/train.py`: single editable experiment surface; trains and evaluates one bounded head-only run
+- `autoresearch_head/program.md`: instructions for an external coding agent
+
+Typical setup:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .[train]
+python autoresearch_head/prepare.py
+python autoresearch_head/train.py
+```
+
+Run outputs land in:
+- `autoresearch_head/results.tsv`: append-only experiment log
+- `autoresearch_head/runs/<timestamp>/summary.json`: per-run metrics and config snapshot
+
+`train.py` prints a small fixed metric surface intended for search loops:
+- `PRIMARY_SCORE`
+- `NET_SCORE`
+- `CONCEPT_ACCURACY`
+- `WALL_SECONDS`
+- `PEAK_VRAM_MB`
+
 ## Phase 2: Introspection Fine-Tuning
 
 Two training approaches are available for enhancing behavioral introspection:
